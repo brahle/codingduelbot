@@ -76,13 +76,9 @@ sub event_message_own_public ($$$) {
 sub parse ($$$) {
     my ($nick, $text, $target) = @_;
     if ($text =~ /^!duel$/) {
-        if (defined $sessions{$target}{score}{$nick}) {
-            line2target($target, "$nick: You have: ".$sessions{$target}{totalscore}{$nick}. " points.");
-        } else {
-            line2target($target, "$nick: You don't have any points.");
-        }
+        line2target($target, "$nick: Try !duel <nick> <URL>.");
     }
-    if ($text =~ /^!duel start ([a-zA-Z0-9]+) (http:\/\/(.*))/) {
+    if ($text =~ /^!duel start ([a-zA-Z0-9_-]+) (.*)/) {
         my $defendant = $1;
         my $task = $2;
         if (defined $sessions{$target}{dueling}{$nick}) {
@@ -93,11 +89,27 @@ sub parse ($$$) {
                 line2target($target, "$nick: $defendant is already in a duel with ".$sessions{$target}{dueling}{$defendant});
             }
             else {
-                $sessions{$target}{dueling}{$defendant} = $nick;
                 $sessions{$target}{dueling}{$nick} = $defendant;
-                line2target($target, "$defendant: >>>> Challenged by $nick with $task. FIGHT! <<<<")
+                $sessions{$target}{dueling}{$defendant} = "PENDING@".$nick;
+                line2target($target, "$defendant: >>>> Challenged by $nick with $task. !duel accept or !duel reject. <<<<")
             }
         }
+    }
+    if ($text =~ /^!duel accept$/) {	
+	if (defined $sessions{$target}{dueling}{$nick}) {
+	   $sessions{$target}{dueling}{$nick} =~ s/PENDING@//;
+	   my $opponent = $sessions{$target}{dueling}{$nick};
+	   line2target($target, "$opponent: $nick accepted your challenge. >>>> FIGHT! <<<<"); 
+	}
+    }
+    if ($text =~ /^!duel reject$/) {
+	if (defined $sessions{$target}{dueling}{$nick}) {	
+	   $sessions{$target}{dueling}{$nick} =~ s/PENDING@//;
+	   my $opponent = $sessions{$target}{dueling}{$nick};
+           delete $sessions{$target}{dueling}{$nick};
+	   delete $sessions{$target}{dueling}{$opponent};
+	   line2target($target, ">>>> $nick rejected. <<<<"); 
+	}
     }
     if ($text =~ /^!duel defeat$/) {
         if (defined $sessions{$target}{dueling}{$nick}) {
@@ -109,14 +121,14 @@ sub parse ($$$) {
             line2target($target, ">>>> $opponent defeated $nick! ($nick claimed defeat) <<<<")
         }
     }
-    if ($text =~ /^!duel score ([a-zA-Z0-9]+) ([a-zA-Z0-9]+)$/) {
+    if ($text =~ /^!duel score ([a-zA-Z0-9_-]+) ([a-zA-Z0-9_-]+)/) {
         if (defined $sessions{$target}{score}{$1}{$2}) {
             line2target($target, ">>>> $1 defeated $2 ".$sessions{$target}{score}{$1}{$2}." times. <<<<")
         } else {
             line2target($target, ">>>> $1 never defeated $2.<<<<")
         }
     }
-    if ($text =~ /^!duel approve ([a-zA-Z0-9]+) ([a-zA-Z0-9]+)$/) {        
+    if ($text =~ /^!duel approve ([a-zA-Z0-9_-]+) ([a-zA-Z0-9_-]+)/) {        
         if (defined $sessions{$target}{dueling}{$1} and defined $sessions{$target}{dueling}{$2}) {
             if ($sessions{$target}{dueling}{$1} eq $2 and $sessions{$target}{dueling}{$2} eq $1) { 
                 if (($nick ne $1) and ($nick ne $2)) {
@@ -167,11 +179,7 @@ sub list_sessions {
 
 sub event_nicklist_changed ($$$) {
     my ($channel, $nick, $oldnick) = @_;
-    my $target = $channel->{name};
-    return unless (defined $sessions{$target} && $sessions{$target}{score}{$oldnick});
-    my $points = $sessions{$target}{score}{$oldnick};
-    $sessions{$target}{score}{$nick->{nick}} = $points;
-    delete $sessions{$target}{score}{$oldnick};
+    # handle incoming guests
 }
 
 sub cmd_codingduel ($$$) {
