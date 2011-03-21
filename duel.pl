@@ -8,7 +8,7 @@ $VERSION = '2011/03/20';
 	   description => 'Monitor Duels between users (based on Quizmaster script by Stefan Tomanek)',
 	   license     => 'GPLv3',
 	   url         => 'http://irssi.org/scripts/',
-	   changed     =>  $VERSION,
+	   changed     => $VERSION,
 	   modules     => 'Data::Dumper',
 	   commands    => "duel"
 );
@@ -26,6 +26,8 @@ sub show_help() {
     Enable duels in the current channel.
 /duel score
     Display the scoretable of  the current game.
+/duel stop
+    Stop dueling in the current channel.
 ";
     my $text='';
     foreach (split(/\n/, $help)) {
@@ -198,17 +200,44 @@ sub cmd_codingduel ($$$) {
     }
 }
 
+sub recover() {
+    local *F;    
+    no strict 'vars';
+    my $filename = Irssi::settings_get_str('duel_score_file');
+    return unless -e $filename;
+    open(F, $filename);
+    $data .= $_ foreach (<F>);
+    close F;
+    return unless "$data";
+    %sessions = %{ eval "$data" };
+}
+
+sub persist() {
+    local *F;
+    my $filename = Irssi::settings_get_str('duel_score_file');
+    open(F, ">".$filename);
+    my $dumper = Data::Dumper->new([\%sessions], ['sessions']);
+    $dumper->Purity(1)->Deepcopy(1);
+    my $data = $dumper->Dump;
+    print F $data;
+    close F; 
+}
+
 Irssi::command_bind($IRSSI{'name'}, \&cmd_codingduel);
-foreach my $cmd ('score', 'start', 'help') {
+foreach my $cmd ('score', 'start', 'help', 'stop') {
 Irssi::command_bind('codingduel '.$cmd => sub {
                     cmd_codingduel("$cmd ".$_[0], $_[1], $_[2]); });
 }
 
 
 Irssi::settings_add_int($IRSSI{'name'}, 'codingduel_timeout', 60);
+Irssi::settings_add_str($IRSSI{'name'}, 'duel_score_file', "$ENV{HOME}/.irssi/duel_scorese");
 
 Irssi::signal_add('message public', 'event_public_message');
 Irssi::signal_add('message own_public', 'event_message_own_public');
 Irssi::signal_add('nicklist changed', 'event_nicklist_changed');
+
+Irssi::timeout_add(60000, 'persist', undef);
+recover();
 
 print CLIENTCRAP '%B>>%n '.$IRSSI{name}.' '.$VERSION.' loaded: /duel help for help';
