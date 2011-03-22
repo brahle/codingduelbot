@@ -1,9 +1,9 @@
 use strict;
 
 use vars qw($VERSION %IRSSI);
-$VERSION = '2011/03/20';
+$VERSION = '2011/03/22';
 %IRSSI = (
-	   authors     => 'Marko Ivankovic',
+	   authors     => 'Marko Ivankovic', 'Bruno Rahle'
 	   name        => 'duel',
 	   description => 'Monitor Duels between users (based on Quizmaster script by Stefan Tomanek)',
 	   license     => 'GPLv3',
@@ -39,7 +39,7 @@ sub show_help() {
 
 sub draw_box ($$$$) {
     my ($title, $text, $footer, $colour) = @_;
-    my $box = ''; 
+    my $box = '';
     $box .= '%R,--[%n%9%U'.$title.'%U%9%R]%n'."\n";
     foreach (split(/\n/, $text)) {
         $box .= '%R|%n '.$_."\n";
@@ -78,7 +78,7 @@ sub event_message_own_public ($$$) {
 sub parse ($$$) {
     my ($nick, $text, $target) = @_;
     if ($text =~ /^!duel$/) {
-        line2target($target, "$nick: Try !duel <nick> <URL>.");
+        line2target($target, "$nick: Try !duel start <nick> <URL>.");
     }
     if ($text =~ /^!duel start ([a-zA-Z0-9_-]+) (.*)/) {
         my $defendant = $1;
@@ -97,20 +97,20 @@ sub parse ($$$) {
             }
         }
     }
-    if ($text =~ /^!duel accept$/) {	
+    if ($text =~ /^!duel accept$/) {
 	if (defined $sessions{$target}{dueling}{$nick}) {
 	   $sessions{$target}{dueling}{$nick} =~ s/PENDING@//;
 	   my $opponent = $sessions{$target}{dueling}{$nick};
-	   line2target($target, "$opponent: $nick accepted your challenge. >>>> FIGHT! <<<<"); 
+	   line2target($target, "$opponent: $nick accepted your challenge. >>>> FIGHT! <<<<");
 	}
     }
     if ($text =~ /^!duel reject$/) {
-	if (defined $sessions{$target}{dueling}{$nick}) {	
+	if (defined $sessions{$target}{dueling}{$nick}) {
 	   $sessions{$target}{dueling}{$nick} =~ s/PENDING@//;
 	   my $opponent = $sessions{$target}{dueling}{$nick};
            delete $sessions{$target}{dueling}{$nick};
 	   delete $sessions{$target}{dueling}{$opponent};
-	   line2target($target, ">>>> $nick rejected. <<<<"); 
+	   line2target($target, ">>>> $nick rejected. <<<<");
 	}
     }
     if ($text =~ /^!duel defeat$/) {
@@ -130,15 +130,15 @@ sub parse ($$$) {
             line2target($target, ">>>> $1 never defeated $2.<<<<")
         }
     }
-    if ($text =~ /^!duel approve ([a-zA-Z0-9_-]+) ([a-zA-Z0-9_-]+)/) {        
+    if ($text =~ /^!duel approve ([a-zA-Z0-9_-]+) ([a-zA-Z0-9_-]+)/) {
         if (defined $sessions{$target}{dueling}{$1} and defined $sessions{$target}{dueling}{$2}) {
-            if ($sessions{$target}{dueling}{$1} eq $2 and $sessions{$target}{dueling}{$2} eq $1) { 
+            if ($sessions{$target}{dueling}{$1} eq $2 and $sessions{$target}{dueling}{$2} eq $1) {
                 if (($nick ne $1) and ($nick ne $2)) {
                     $sessions{$target}{score}{$1}{$2}++;
                     $sessions{$target}{totalscore}{$1}++;
                     delete $sessions{$target}{dueling}{$1};
                     delete $sessions{$target}{dueling}{$2};
-                    line2target($target, ">>>> $1 defeated $2! ($nick approved)<<<<");                    
+                    line2target($target, ">>>> $1 defeated $2! ($nick approved)<<<<");
                 }
             }
         }
@@ -164,7 +164,7 @@ sub line2target ($$) {
 sub show_scores ($) {
     my ($target) = @_;
     my $table;
-    foreach (sort {$sessions{$target}{score}{$b} <=> $sessions{$target}{score}{$a}} keys(%{$sessions{$target}{score}})) {
+    foreach (sort {$sessions{$target}{totalscore}{$b} <=> $sessions{$target}{totalscore}{$a}} keys(%{$sessions{$target}{totalscore}})) {
     	 $table .= "$_ now has ".$sessions{$target}{totalscore}{$_}." points.\n";
     }
     my $box = draw_box('Coding Duel', $table, 'score', 0);
@@ -201,7 +201,7 @@ sub cmd_codingduel ($$$) {
 }
 
 sub recover() {
-    local *F;    
+    local *F;
     no strict 'vars';
     my $filename = Irssi::settings_get_str('duel_score_file');
     return unless -e $filename;
@@ -220,7 +220,7 @@ sub persist() {
     $dumper->Purity(1)->Deepcopy(1);
     my $data = $dumper->Dump;
     print F $data;
-    close F; 
+    close F;
 }
 
 Irssi::command_bind($IRSSI{'name'}, \&cmd_codingduel);
